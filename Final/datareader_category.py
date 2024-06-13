@@ -100,7 +100,6 @@ def train(dataset):
             tqdm_loader.set_postfix(average_accuracy = average_accuracy, accuracy = accuracy)
 
 def test(dataset, sample_df):
-    total_accuracy = 0
     predict_list = []
     with tqdm(dataset, unit = 'data', desc = 'Test') as tqdm_loader:
         for index, data in enumerate(tqdm_loader):

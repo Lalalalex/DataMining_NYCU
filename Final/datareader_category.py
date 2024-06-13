@@ -5,34 +5,53 @@ from torch.utils.data import Dataset, DataLoader
 import json
 from tqdm import tqdm
 from sklearn.preprocessing import LabelEncoder
-
+import numpy as np
 
 class Dataset(Dataset):
-    def __init__(self, behaviors_path, news_path, embeddings_parh, is_test_model = False):
+    def __init__(self, behaviors_path, news_path, embeddings_parh, is_test_model = False, encode_type = 'one_hot'):
         self.behaviors_df = pd.read_csv(behaviors_path, sep='\t')
         self.news_df = pd.read_csv(news_path, sep='\t')
         self.embeddings_df = pd.read_csv(embeddings_parh)
         self.is_test_model = is_test_model
+        self.encode_type = encode_type
         self.categorical_cols = ['category', 'subcategory']
-        self.news_df = self.label_encode(self.news_df)
+        if encode_type == 'one_hot':
+            self.news_df = self.one_hot_encode(self.news_df)
+        else:
+            self.news_df = self.label_encode(self.news_df)
 
     def __len__(self):
         return len(self.behaviors_df)
     
     def get_news_info(self, news_id):
         news_info = self.news_df[self.news_df['news_id'] == news_id]
+        if self.encode_type == 'label':
+            if news_info.empty:
+                return {'category': 0, 'subcategory': 0}
+            news_info = news_info.iloc[0]
+            return {
+                'category': news_info['category'], 
+                'subcategory': news_info['subcategory']
+            }
+        
         if news_info.empty:
-            return {'category': 0, 'subcategory': 0}
+            return {'category': np.zeros(len(self.news_df.filter(like='category_').columns)), 
+                    'subcategory': np.zeros(len(self.news_df.filter(like='subcategory_').columns))}
         news_info = news_info.iloc[0]
         return {
-            'category': news_info['category'], 
-            'subcategory': news_info['subcategory']
+            'category': news_info.filter(like='category_').astype(int).to_numpy(),
+            'subcategory': news_info.filter(like='subcategory_').astype(int).to_numpy()
         }
 
     def label_encode(self, df):
         for ft in self.categorical_cols:
             le = LabelEncoder()
             self.news_df[ft] = le.fit_transform(self.news_df[ft].astype(str))
+        return df
+    
+    def one_hot_encode(self, df):
+        for ft in self.categorical_cols:
+            df = pd.get_dummies(df, columns=[ft], prefix=[ft])
         return df
     
     def __getitem__(self, index):
